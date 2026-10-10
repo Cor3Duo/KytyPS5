@@ -5,10 +5,12 @@
 #include <QString>
 #include <QStringList>
 class QByteArray;
+class QGridLayout;
 class QGroupBox;
 class QListWidget;
 class QMoveEvent;
 class QResizeEvent;
+class QScrollArea;
 class QToolButton;
 class QSettings;
 class QWidget;
@@ -39,6 +41,8 @@ signals:
 private:
 	Ui::ConfigurationEditDialog* m_ui = nullptr;
 	Configuration&               m_info;
+	QScrollArea*                 m_scroll_area            = nullptr;
+	QGridLayout*                 m_content_layout         = nullptr;
 	QGroupBox*                   m_game_dirs_group        = nullptr;
 	QListWidget*                 m_game_dirs_list         = nullptr;
 	QToolButton*                 m_remove_game_dir_button = nullptr;
@@ -46,7 +50,9 @@ private:
 
 protected:
 	void Init(const Configuration& info);
+	void InitScrollArea();
 	void InitGameDirectories();
+	void GrowToContents();
 	void AddGameDirectoryItem(const QString& dir);
 
 	void moveEvent(QMoveEvent* event) override;

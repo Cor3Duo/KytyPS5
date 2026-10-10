@@ -13,6 +13,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLayout>
@@ -23,6 +24,8 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScreen>
+#include <QScrollArea>
 #include <QSettings>
 #include <QSlider>
 #include <QSpinBox>
@@ -125,6 +128,7 @@ ConfigurationEditDialog::ConfigurationEditDialog(Configuration& info, QWidget* p
       m_info(info) {
 	m_ui->setupUi(this);
 	setMinimumWidth(width());
+	InitScrollArea();
 	InitGameDirectories();
 	m_ui->controller_group->setVisible(false);
 	m_ui->settings_button->setVisible(false);
@@ -172,6 +176,7 @@ ConfigurationEditDialog::ConfigurationEditDialog(Configuration& info, QWidget* p
 	restoreGeometry(g_last_geometry);
 
 	Init(info);
+	GrowToContents();
 }
 
 QByteArray ConfigurationEditDialog::g_last_geometry;
@@ -313,6 +318,37 @@ void ConfigurationEditDialog::Init(const Configuration& info) {
 	m_ui->checkBox_profiler->setChecked(info.profiler_enabled);
 }
 
+// The settings scroll above the button row, so the dialog also fits screens shorter than them.
+void ConfigurationEditDialog::InitScrollArea() {
+	m_scroll_area = new QScrollArea(this);
+	m_scroll_area->setWidgetResizable(true);
+	m_scroll_area->setFrameShape(QFrame::NoFrame);
+
+	auto* content    = new QWidget(m_scroll_area);
+	m_content_layout = new QGridLayout(content);
+	m_content_layout->setContentsMargins(0, 0, 0, 0);
+	m_content_layout->setHorizontalSpacing(m_ui->gridLayout->horizontalSpacing());
+	m_content_layout->setVerticalSpacing(m_ui->gridLayout->verticalSpacing());
+
+	m_ui->gridLayout->removeItem(m_ui->sectionsLayout);
+	m_ui->sectionsLayout->setParent(nullptr);
+	m_content_layout->addLayout(m_ui->sectionsLayout, 0, 0, 1, 2);
+	m_ui->gridLayout->removeWidget(m_ui->controller_group);
+	m_content_layout->addWidget(m_ui->controller_group, 1, 1);
+
+	m_scroll_area->setWidget(content);
+	m_ui->gridLayout->addWidget(m_scroll_area, 0, 0, 1, 2);
+}
+
+// Grows the dialog until the settings no longer scroll, without leaving the screen.
+void ConfigurationEditDialog::GrowToContents() {
+	layout()->activate();
+	const auto missing   = m_scroll_area->widget()->sizeHint() - m_scroll_area->size();
+	const auto available = screen()->availableGeometry().size() -
+	                       QSize(0, style()->pixelMetric(QStyle::PM_TitleBarHeight));
+	resize((size() + missing.expandedTo(QSize(0, 0))).boundedTo(available));
+}
+
 void ConfigurationEditDialog::InitGameDirectories() {
 	m_game_dirs_group = new QGroupBox(tr("Game folders"), this);
 
@@ -344,7 +380,7 @@ void ConfigurationEditDialog::InitGameDirectories() {
 	button_layout->addStretch(1);
 	group_layout->addLayout(button_layout);
 
-	m_ui->gridLayout->addWidget(m_game_dirs_group, 1, 0, 1, 1);
+	m_content_layout->addWidget(m_game_dirs_group, 1, 0, 1, 1);
 	m_game_dirs_group->setVisible(false);
 
 	connect(add_button, &QToolButton::clicked, this, &ConfigurationEditDialog::add_game_directory);
@@ -373,8 +409,7 @@ void ConfigurationEditDialog::SetGlobalSettings(const QStringList& dirs) {
 	m_game_dirs_group->setVisible(true);
 	m_ui->controller_group->setVisible(true);
 	update_game_directory_buttons();
-	layout()->activate();
-	resize(size().expandedTo(minimumSizeHint()));
+	GrowToContents();
 }
 
 QStringList ConfigurationEditDialog::GetGameDirectories() const {
